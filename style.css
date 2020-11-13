@@ -1,0 +1,34 @@
+*,
+*::before,
+*::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: inherit;
+}
+
+html {
+  box-sizing: border-box;
+}
+
+header {
+  padding-top: 18px;
+}
+
+header h1 {
+  text-align: center;
+}
+
+main {
+  margin: auto;
+  margin-top: 40px;
+  width: 400px;
+  height: 400px;
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.pixel {
+  width: 20px;
+  height: 20px;
+  border: solid 0.5px #bbb;
+}
