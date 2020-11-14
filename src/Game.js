@@ -6,63 +6,170 @@ class Game {
     right: Symbol.for('right'),
   }
   constructor() {
+    this.batchedFunctionCall = []
     this.initializeBoard()
     this.initializeControl()
+    this.render()
   }
   start() {
     this.requestNextTick(this.render)
   }
   reset() {}
   render() {
+    let updateQueue = []
+    let isOver = false
     if (this.isFirstRender) {
+      updateQueue.push({
+        type: 'add',
+        className: 'food',
+        coordinate: this.food,
+      })
+      this.snakeCoordinates.forEach((coordinate) => {
+        updateQueue.push({
+          type: 'add',
+          className: 'snake',
+          coordinate,
+        })
+      })
     } else {
+      updateQueue = this.calculateUpdateQueue()
+    }
+    for (const update of updateQueue) {
+      const { type, coordinate, className } = update
+      const index = this.convertCoordinateToIndex(coordinate)
+      const pixel = this.boardElm.querySelector(`.pixel:nth-child(${index})`)
+      switch (type) {
+        case 'add':
+          pixel.classList.add(className)
+          break
+        case 'remove':
+          pixel.classList.remove(className)
+          break
+        default:
+          throw new Error(`unknown update type [${type}]`)
+      }
     }
     this.isFirstRender = false
+    return !isOver
   }
-  convertCoordinateToIndex() {}
-  calculateNextSnake(currentSnake, direction) {
-    const updateQueue = []
-    const nextSnake = []
-    switch (direction) {
-      case Game.Direction.up:
-        break
-      case Game.Direction.down:
-        break
-      case Game.Direction.left:
-        break
-      case Game.Direction.right:
-        break
-      default:
-        throw new Error('unknown direction')
+  convertCoordinateToIndex(coordinate) {
+    const [x, y] = coordinate
+    return y * Math.sqrt(this.pixelNumber) + x + 1
+  }
+  calculateUpdateQueue() {
+    const calculateNextPixels = (current, direction) => {
+      const maxIndex = Math.sqrt(this.pixelNumber) - 1
+      let nextSnake = []
+      let updateQueue = []
+      switch (direction) {
+        case Game.Direction.up:
+          nextSnake = current.map((pixel, index) => {
+            if (index === 0) {
+              const [x, y] = pixel
+              return [x, y - 1 < 0 ? maxIndex : y - 1]
+            } else {
+              return [...current[index - 1]]
+            }
+          })
+          break
+        case Game.Direction.down:
+          nextSnake = current.map((pixel, index) => {
+            if (index === 0) {
+              const [x, y] = pixel
+              return [x, y + 1 > maxIndex ? 0 : y + 1]
+            } else {
+              return [...current[index - 1]]
+            }
+          })
+          break
+        case Game.Direction.left:
+          nextSnake = current.map((pixel, index) => {
+            if (index === 0) {
+              const [x, y] = pixel
+              return [x - 1 < 0 ? maxIndex : x - 1, y]
+            } else {
+              return [...current[index - 1]]
+            }
+          })
+          break
+        case Game.Direction.right:
+          nextSnake = current.map((pixel, index) => {
+            if (index === 0) {
+              const [x, y] = pixel
+              return [x + 1 > maxIndex ? 0 : x + 1, y]
+            } else {
+              return [...current[index - 1]]
+            }
+          })
+          break
+        default:
+          throw new Error('unknown direction')
+      }
+      updateQueue.push({
+        type: 'add',
+        className: 'snake',
+        coordinate: nextSnake[0],
+      })
+      updateQueue.push({
+        type: 'remove',
+        className: 'snake',
+        coordinate: current[current.length - 1],
+      })
+      return { nextSnake, updateQueue }
     }
-    return { nextSnake, updateQueue }
+    const { nextSnake, updateQueue } = calculateNextPixels(
+      this.snakeCoordinates,
+      this.direction
+    )
+    this.snakeCoordinates = nextSnake
+    return updateQueue
   }
   initializeBoard() {
-    this.maxIndex = 400
+    this.pixelNumber = 400
     this.boardElm = document.querySelector('main')
     this.snakeCoordinates = this.getRandomSnakes()
+    this.food = this.getRandomFood()
+    this.foodsInBelly = []
     this.direction = this.getRandomDirection()
-    this.speed = 1000
-    for (let i = 0; i < this.maxIndex; i++) {
+    this.speed = 500
+    for (let i = 0; i < this.pixelNumber; i++) {
       const pixelElm = document.createElement('div')
       pixelElm.classList.add('pixel')
       this.boardElm.append(pixelElm)
     }
+    this.isFirstRender = true
   }
   initializeControl() {
     window.addEventListener('keydown', (event) => {
       if (
         ['ArrowUp', 'ArrowRight', 'ArrowDown', 'ArrowLeft'].includes(event.code)
       ) {
-        this.handleDirectionChange(event.code)
+        this.batchDirectionChange(() => {
+          switch (event.code) {
+            case 'ArrowUp':
+              return Game.Direction.up
+            case 'ArrowRight':
+              return Game.Direction.right
+            case 'ArrowDown':
+              return Game.Direction.down
+            case 'ArrowLeft':
+              return Game.Direction.left
+          }
+        })
       }
     })
   }
+  getRandomFood() {
+    if ((this.snakeCoordinates?.length ?? 0) === 0) {
+      throw new Error('food must be generated after snake generated')
+    }
+    return [0, 0]
+  }
   getRandomSnakes() {
     return [
-      [128, 234],
-      [128, 235],
-      [128, 236],
+      [11, 2],
+      [11, 3],
+      [11, 4],
     ]
   }
   getRandomDirection() {
@@ -70,18 +177,38 @@ class Game {
       ['up', 'down', 'left', 'right'][Math.floor(Math.random() * 4)]
     ]
   }
-  handleDirectionChange(type) {
-    console.log(type)
-  }
   requestNextTick(cb) {
     setTimeout(() => {
       requestAnimationFrame(() => {
+        let nextDirection
+        this.batchedFunctionCall.forEach((fn) => {
+          if (typeof fn === 'function') nextDirection = fn()
+        })
+        this.batchedFunctionCall = []
+        const isOppositeOfCurrent = (direction) => {
+          switch (direction) {
+            case Game.Direction.up:
+              return this.direction === Game.Direction.down
+            case Game.Direction.right:
+              return this.direction === Game.Direction.left
+            case Game.Direction.down:
+              return this.direction === Game.Direction.up
+            case Game.Direction.left:
+              return this.direction === Game.Direction.right
+          }
+        }
+        if (nextDirection != undefined && !isOppositeOfCurrent(nextDirection)) {
+          this.direction = nextDirection
+        }
         const isContinue = cb.call(this)
         if (isContinue === true) {
           this.requestNextTick(cb)
         }
       })
     }, this.speed)
+  }
+  batchDirectionChange(cb) {
+    this.batchedFunctionCall.push(cb.bind(this))
   }
 }
 

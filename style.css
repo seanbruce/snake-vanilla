@@ -32,3 +32,11 @@ main {
   height: 20px;
   border: solid 0.5px #bbb;
 }
+
+.pixel.snake {
+  background-color: lawngreen;
+}
+
+.pixel.food {
+  background-color: lightcoral;
+}
