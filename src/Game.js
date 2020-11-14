@@ -147,13 +147,17 @@ class Game {
         this.batchDirectionChange(() => {
           switch (event.code) {
             case 'ArrowUp':
-              return Game.Direction.up
+              this.direction = Game.Direction.up
+              break
             case 'ArrowRight':
-              return Game.Direction.right
+              this.direction = Game.Direction.right
+              break
             case 'ArrowDown':
-              return Game.Direction.down
+              this.direction = Game.Direction.down
+              break
             case 'ArrowLeft':
-              return Game.Direction.left
+              this.direction = Game.Direction.left
+              break
           }
         })
       }
@@ -180,25 +184,25 @@ class Game {
   requestNextTick(cb) {
     setTimeout(() => {
       requestAnimationFrame(() => {
-        let nextDirection
+        let prevDirection = this.direction
         this.batchedFunctionCall.forEach((fn) => {
-          if (typeof fn === 'function') nextDirection = fn()
+          if (typeof fn === 'function') fn()
         })
         this.batchedFunctionCall = []
-        const isOppositeOfCurrent = (direction) => {
-          switch (direction) {
+        const isOppositeOfCurrent = (current, newDirection) => {
+          switch (newDirection) {
             case Game.Direction.up:
-              return this.direction === Game.Direction.down
+              return current === Game.Direction.down
             case Game.Direction.right:
-              return this.direction === Game.Direction.left
+              return current === Game.Direction.left
             case Game.Direction.down:
-              return this.direction === Game.Direction.up
+              return current === Game.Direction.up
             case Game.Direction.left:
-              return this.direction === Game.Direction.right
+              return current === Game.Direction.right
           }
         }
-        if (nextDirection != undefined && !isOppositeOfCurrent(nextDirection)) {
-          this.direction = nextDirection
+        if (isOppositeOfCurrent(prevDirection, this.direction)) {
+          this.direction = prevDirection
         }
         const isContinue = cb.call(this)
         if (isContinue === true) {
